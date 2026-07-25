@@ -1,0 +1,11 @@
+Pal Admin is distributed under the GNU General Public License, version 3 or
+any later version.
+
+The complete license text is included in:
+
+    licenses/palsav-flex-GPL-3.0-or-later.txt
+
+The release bundles the corresponding source for the GPL save backend under
+`third_party/palsav-flex`. This notice does not grant rights to Palworld,
+Palworld names, or game-derived assets.
+

@@ -1,0 +1,14 @@
+Pal Admin portrait asset attribution
+
+The portrait images in this directory are reference assets sourced from the
+PalCalc project by Tyler Camp. PalCalc is Copyright 2024 Tyler Camp and is
+distributed under the MIT License. The corresponding PalCalc license is not
+included in the proposed public source tree with the omitted portrait files.
+Review the PalCalc project and the asset terms before obtaining or
+redistributing those files. The expected source location in the original
+workspace was:
+
+tools/asset-extraction/PalCalc/LICENSE.txt
+
+Palworld names and game-derived artwork remain the property of their
+respective rights holders. These portraits are optional editor reference art.

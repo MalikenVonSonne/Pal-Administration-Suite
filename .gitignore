@@ -1,0 +1,76 @@
+# Python caches and local environments
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.venv/
+venv/
+env/
+ENV/
+
+# Local configuration and credentials
+.env
+.env.*
+!.env.example
+
+# Generated build, packaging, release, and historical material
+/analysis/
+/archives/
+/milestones/
+/release/
+/build/*
+!/build/PalAdmin.spec
+*.spec.bak
+dist/
+work/
+logs/
+*.log
+*.manifest
+
+# Archives and compiled binaries
+*.zip
+*.7z
+*.rar
+*.exe
+*.dll
+*.pyd
+*.so
+*.dylib
+
+# Palworld saves, backups, snapshots, and transaction artifacts
+*.sav
+*.sav.*
+*.bak
+*.backup
+runtime_snapshot.json
+PalAdminBackups/
+transactions/
+
+# Generated Python package metadata and native dependency builds
+**/*.egg-info/
+**/.eggs/
+/third_party/palsav-flex/
+/third_party/palsav-flex/palooz/build/
+
+# Historical and internal planning records
+/docs/*
+
+# Local asset-extraction tools and generated extraction output
+/tools/asset-extraction/FModel/
+/tools/asset-extraction/UE4SS/
+/data/extracted/
+
+# Optional, game-derived build inputs are documented in BUILD.md
+/data/catalogs/*.json
+/data/catalogs/*.manifest.json
+/data/schemas/
+/data/portraits/*
+!/data/portraits/ATTRIBUTION.txt
+/tools/asset-extraction/PalCalc/
+
+# Internal source-boundary test for the private workspace layout
+/project/editor/tests/test_phase5_source_boundary.py
