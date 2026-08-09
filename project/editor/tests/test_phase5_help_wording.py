@@ -38,7 +38,7 @@ def test_phase5_help_dialog_content_is_selectable_user_facing_text(monkeypatch) 
     assert "PalCalc" in ATTRIBUTION_TEXT
     assert "MIT License" in ATTRIBUTION_TEXT
     assert "GNU General Public License" in ATTRIBUTION_TEXT
-    assert "Pal Administration Suite v1.0.0" in ABOUT_TEXT
+    assert "Pal Administration Suite v1.0.1" in ABOUT_TEXT
     assert "Created by MalikenVonSonne" in ABOUT_TEXT
     assert ABOUT_TEXT.count("Created by MalikenVonSonne") == 1
     assert "MalikenVonSonne" not in ATTRIBUTION_TEXT

@@ -1,4 +1,4 @@
-# Pal Administration Suite v1.0.0
+# Pal Administration Suite v1.0.1
 
 Pal Admin is a standalone Windows Palworld save editor for players who want a
 clear, reviewable way to inspect and adjust Pal records. It works offline with

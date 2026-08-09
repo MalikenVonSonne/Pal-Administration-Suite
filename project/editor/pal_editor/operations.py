@@ -11,7 +11,7 @@ from typing import Any
 from palsav.gvas import GvasFile
 from palsav.io import load_sav, save_sav
 
-from .domain import PalTemplate
+from .domain import OPTIONAL_IV_FIELDS, PalTemplate
 from .validation import validate_template
 
 
@@ -129,6 +129,33 @@ def _set_nickname(properties: dict[str, Any], value: str, changed: list[str]) ->
     _set_scalar(properties, "NickName", value, changed)
 
 
+def _validate_missing_optional_ivs(
+    document: dict[str, Any],
+    edit: BatchEdit,
+) -> None:
+    """Reject only explicit writes to optional IV fields that are absent.
+
+    A missing optional IV is represented by ``None`` in a template and is
+    intentionally skipped by the normal apply path.  If a caller supplies a
+    concrete value, fail before mutating any entry so a multi-Pal batch cannot
+    partially apply in memory before the missing field is discovered.
+    """
+
+    properties = _properties_for_entry(_entry_for_instance(document, edit.instance_id))
+    context = edit.display_context or edit.instance_id
+    missing: list[str] = []
+    for template_field, property_name, label in OPTIONAL_IV_FIELDS:
+        value = getattr(edit.template, template_field)
+        if value is not None and property_name not in properties:
+            missing.append(f"{label} ({property_name})")
+    if missing:
+        fields_text = ", ".join(missing)
+        raise SaveEditError(
+            f"{context}: cannot edit {fields_text} because the field is not present "
+            "in this Pal record. Pal Admin will preserve the field's absence."
+        )
+
+
 def _apply_template_unvalidated(
     document: dict[str, Any],
     instance_id: str,
@@ -186,6 +213,8 @@ def apply_templates(
             messages = "; ".join(issue.message for issue in report.errors)
             raise SaveEditError(f"{context}: template failed validation: {messages}")
         _entry_for_instance(document, edit.instance_id)
+    for edit in normalized:
+        _validate_missing_optional_ivs(document, edit)
     return tuple(
         _apply_template_unvalidated(document, edit.instance_id, edit.template)
         for edit in normalized

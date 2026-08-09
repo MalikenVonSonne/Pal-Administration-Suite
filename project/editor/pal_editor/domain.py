@@ -6,6 +6,17 @@ from dataclasses import asdict, dataclass, field
 from typing import Any
 
 
+# Normalized template field, raw save property, and user-facing label for each
+# optional IV.  These properties may be omitted from otherwise valid Pal
+# records, so callers must preserve that absence unless the user explicitly
+# requests an edit.
+OPTIONAL_IV_FIELDS: tuple[tuple[str, str, str], ...] = (
+    ("iv_hp", "Talent_HP", "HP IV"),
+    ("iv_attack", "Talent_Shot", "Attack IV"),
+    ("iv_defense", "Talent_Defense", "Defense IV"),
+)
+
+
 def _text(value: Any) -> str | None:
     if value is None:
         return None

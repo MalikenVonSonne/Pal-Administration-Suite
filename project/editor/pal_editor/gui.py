@@ -51,7 +51,7 @@ from .__main__ import inspect
 from . import __version__
 from .backup_store import RETENTION_LIMIT, default_backup_root
 from .direct_save import DirectSaveCoordinator, DirectSaveRequest, validate_edit_batch
-from .domain import PalInstance, PalTemplate
+from .domain import OPTIONAL_IV_FIELDS, PalInstance, PalTemplate
 from .game_data import CatalogEntry, GameDataCatalog
 from .ledger import BackupPolicy, OperationLedger
 from .operations import BatchEdit, BatchEditResult, SaveEditError, edit_save_copy_batch
@@ -175,6 +175,7 @@ class PalEditorWindow(QMainWindow):
         self.catalog = GameDataCatalog.load()
         self.active_initial: list[str] = []
         self.passive_initial: list[str] = []
+        self._iv_edit_intent: set[str] = set()
         self._species_loaded_code: str | None = None
         self._portrait_code: str | None = None
         self._portrait_paths = self._load_portrait_index()
@@ -774,7 +775,12 @@ class PalEditorWindow(QMainWindow):
         self.species_combo.currentIndexChanged.connect(self._refresh_portrait_for_current_species)
         self.nickname_edit.textChanged.connect(self._sync_draft_from_form)
         self.gender_combo.currentIndexChanged.connect(self._sync_draft_from_form)
-        for spin in (self.level_spin, self.rank_spin, self.iv_hp_spin, self.iv_attack_spin, self.iv_defense_spin):
+        for spin in (self.level_spin, self.rank_spin):
+            spin.valueChanged.connect(self._sync_draft_from_form)
+        for field_name, spin in self._iv_spin_fields():
+            spin.valueChanged.connect(
+                lambda _value, field_name=field_name: self._mark_iv_edit_intent(field_name)
+            )
             spin.valueChanged.connect(self._sync_draft_from_form)
         for selector in (*self.active_selectors, *self.passive_selectors):
             selector.currentIndexChanged.connect(self._sync_draft_from_form)
@@ -2597,6 +2603,7 @@ class PalEditorWindow(QMainWindow):
 
         template = self._draft_template_for_index(source_index)
         instance = self.instances[source_index]
+        self._iv_edit_intent = self._pending_absent_iv_intent(source_index)
         self._suppress_form_sync = True
         try:
             self.current_index = source_index
@@ -2650,6 +2657,7 @@ class PalEditorWindow(QMainWindow):
         """Clear stale editor fields when the roster has no active selection."""
         self.species_combo.setCurrentIndex(0)
         self.current_instance_id = None
+        self._iv_edit_intent = set()
         self._species_loaded_code = None
         self.nickname_edit.clear()
         self.gender_combo.setCurrentIndex(0)
@@ -2732,6 +2740,57 @@ class PalEditorWindow(QMainWindow):
             return "Assigned container"
         return "Unavailable"
 
+    def _iv_spin_fields(self) -> tuple[tuple[str, QSpinBox], ...]:
+        """Return the normalized IV names paired with their editor controls."""
+
+        return (
+            (OPTIONAL_IV_FIELDS[0][0], self.iv_hp_spin),
+            (OPTIONAL_IV_FIELDS[1][0], self.iv_attack_spin),
+            (OPTIONAL_IV_FIELDS[2][0], self.iv_defense_spin),
+        )
+
+    @staticmethod
+    def _iv_property_present(
+        instance: PalInstance,
+        template_field: str,
+        property_name: str,
+    ) -> bool:
+        """Use parsed raw names when available, with fixture-safe fallback."""
+
+        if instance.raw_property_names:
+            return property_name in instance.raw_property_names
+        return getattr(instance.template, template_field) is not None
+
+    def _pending_absent_iv_intent(self, source_index: int) -> set[str]:
+        """Recover explicit missing-IV edits when returning to a drafted Pal."""
+
+        instance = self.instances[source_index]
+        if self.ledger is None:
+            return set()
+        identity = str(instance.instance_id or "").strip()
+        entry = self.ledger.draft_for(identity) if identity else None
+        if entry is None:
+            return set()
+        return {
+            template_field
+            for template_field, property_name, _label in OPTIONAL_IV_FIELDS
+            if not self._iv_property_present(instance, template_field, property_name)
+            and template_field in entry.after_fields
+        }
+
+    def _mark_iv_edit_intent(self, template_field: str) -> None:
+        """Remember a user edit to an IV whose raw property was absent."""
+
+        if self._suppress_form_sync or not 0 <= self.current_index < len(self.instances):
+            return
+        instance = self.instances[self.current_index]
+        for field_name, property_name, _label in OPTIONAL_IV_FIELDS:
+            if field_name == template_field and not self._iv_property_present(
+                instance, field_name, property_name
+            ):
+                self._iv_edit_intent.add(field_name)
+                return
+
     @staticmethod
     def _state_text(source: object, draft: object) -> str:
         if source == draft:
@@ -2753,6 +2812,17 @@ class PalEditorWindow(QMainWindow):
             and selected_species.casefold() == self._species_loaded_code.casefold()
         ):
             selected_species = self._species_loaded_code
+        base_instance = self.instances[self.current_index]
+        iv_spins = dict(self._iv_spin_fields())
+        iv_values: dict[str, int | None] = {}
+        for template_field, property_name, _label in OPTIONAL_IV_FIELDS:
+            spin = iv_spins[template_field]
+            if self._iv_property_present(
+                base_instance, template_field, property_name
+            ) or template_field in self._iv_edit_intent:
+                iv_values[template_field] = spin.value()
+            else:
+                iv_values[template_field] = None
         return replace(
             base,
             species=selected_species,
@@ -2760,9 +2830,7 @@ class PalEditorWindow(QMainWindow):
             gender=str(self.gender_combo.currentData() or "").strip() or None,
             level=self.level_spin.value(),
             rank=rank_value if (base.rank is not None or rank_value != 0) else None,
-            iv_hp=self.iv_hp_spin.value(),
-            iv_attack=self.iv_attack_spin.value(),
-            iv_defense=self.iv_defense_spin.value(),
+            **iv_values,
             active_skills=self._selector_values(self.active_selectors, self.active_initial),
             passive_skills=self._selector_values(self.passive_selectors, self.passive_initial),
         )
@@ -3082,6 +3150,21 @@ class PalEditorWindow(QMainWindow):
             seen.add(identity)
             index = matches[0]
             template = replace(self.instances[index].template, **entry.after_fields)
+            missing_iv_edits = [
+                f"{entry.display_context or self._display_context_for_index(index)}: {label} ({property_name})"
+                for template_field, property_name, label in OPTIONAL_IV_FIELDS
+                if not self._iv_property_present(
+                    self.instances[index], template_field, property_name
+                )
+                and template_field in entry.after_fields
+            ]
+            if missing_iv_edits:
+                raise SaveEditError(
+                    "Cannot save this draft because these IV properties are not present "
+                    "in the affected Pal record(s):\n"
+                    + "\n".join(missing_iv_edits)
+                    + "\n\nPal Admin will preserve the field's absence."
+                )
             edits.append(
                 BatchEdit(
                     identity,
